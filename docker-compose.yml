@@ -1,0 +1,8 @@
+services:
+  campfire:
+    image: ghcr.io/stockyard-dev/stockyard-campfire:latest
+    ports: ["9030:9030"]
+    volumes: [campfire-data:/data]
+    restart: unless-stopped
+volumes:
+  campfire-data:
