@@ -1,24 +1,47 @@
 package store
 import ("database/sql";"fmt";"os";"path/filepath";"time";_ "modernc.org/sqlite")
 type DB struct{db *sql.DB}
-type Standup struct{
+type Discussion struct {
 	ID string `json:"id"`
+	Title string `json:"title"`
+	Body string `json:"body"`
 	Author string `json:"author"`
-	Yesterday string `json:"yesterday"`
-	Today string `json:"today"`
-	Blockers string `json:"blockers"`
-	Mood string `json:"mood"`
-	Date string `json:"date"`
+	Category string `json:"category"`
+	ReplyCount int `json:"reply_count"`
+	Pinned int `json:"pinned"`
+	Status string `json:"status"`
 	CreatedAt string `json:"created_at"`
 }
 func Open(d string)(*DB,error){if err:=os.MkdirAll(d,0755);err!=nil{return nil,err};db,err:=sql.Open("sqlite",filepath.Join(d,"campfire.db")+"?_journal_mode=WAL&_busy_timeout=5000");if err!=nil{return nil,err}
-db.Exec(`CREATE TABLE IF NOT EXISTS standups(id TEXT PRIMARY KEY,author TEXT NOT NULL,yesterday TEXT DEFAULT '',today TEXT DEFAULT '',blockers TEXT DEFAULT '',mood TEXT DEFAULT '',date TEXT DEFAULT '',created_at TEXT DEFAULT(datetime('now')))`)
+db.Exec(`CREATE TABLE IF NOT EXISTS discussions(id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT DEFAULT '',author TEXT DEFAULT '',category TEXT DEFAULT '',reply_count INTEGER DEFAULT 0,pinned INTEGER DEFAULT 0,status TEXT DEFAULT 'open',created_at TEXT DEFAULT(datetime('now')))`)
 return &DB{db:db},nil}
 func(d *DB)Close()error{return d.db.Close()}
 func genID()string{return fmt.Sprintf("%d",time.Now().UnixNano())}
 func now()string{return time.Now().UTC().Format(time.RFC3339)}
-func(d *DB)Create(e *Standup)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO standups(id,author,yesterday,today,blockers,mood,date,created_at)VALUES(?,?,?,?,?,?,?,?)`,e.ID,e.Author,e.Yesterday,e.Today,e.Blockers,e.Mood,e.Date,e.CreatedAt);return err}
-func(d *DB)Get(id string)*Standup{var e Standup;if d.db.QueryRow(`SELECT id,author,yesterday,today,blockers,mood,date,created_at FROM standups WHERE id=?`,id).Scan(&e.ID,&e.Author,&e.Yesterday,&e.Today,&e.Blockers,&e.Mood,&e.Date,&e.CreatedAt)!=nil{return nil};return &e}
-func(d *DB)List()[]Standup{rows,_:=d.db.Query(`SELECT id,author,yesterday,today,blockers,mood,date,created_at FROM standups ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Standup;for rows.Next(){var e Standup;rows.Scan(&e.ID,&e.Author,&e.Yesterday,&e.Today,&e.Blockers,&e.Mood,&e.Date,&e.CreatedAt);o=append(o,e)};return o}
-func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM standups WHERE id=?`,id);return err}
-func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM standups`).Scan(&n);return n}
+func(d *DB)Create(e *Discussion)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO discussions(id,title,body,author,category,reply_count,pinned,status,created_at)VALUES(?,?,?,?,?,?,?,?,?)`,e.ID,e.Title,e.Body,e.Author,e.Category,e.ReplyCount,e.Pinned,e.Status,e.CreatedAt);return err}
+func(d *DB)Get(id string)*Discussion{var e Discussion;if d.db.QueryRow(`SELECT id,title,body,author,category,reply_count,pinned,status,created_at FROM discussions WHERE id=?`,id).Scan(&e.ID,&e.Title,&e.Body,&e.Author,&e.Category,&e.ReplyCount,&e.Pinned,&e.Status,&e.CreatedAt)!=nil{return nil};return &e}
+func(d *DB)List()[]Discussion{rows,_:=d.db.Query(`SELECT id,title,body,author,category,reply_count,pinned,status,created_at FROM discussions ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Discussion;for rows.Next(){var e Discussion;rows.Scan(&e.ID,&e.Title,&e.Body,&e.Author,&e.Category,&e.ReplyCount,&e.Pinned,&e.Status,&e.CreatedAt);o=append(o,e)};return o}
+func(d *DB)Update(e *Discussion)error{_,err:=d.db.Exec(`UPDATE discussions SET title=?,body=?,author=?,category=?,reply_count=?,pinned=?,status=? WHERE id=?`,e.Title,e.Body,e.Author,e.Category,e.ReplyCount,e.Pinned,e.Status,e.ID);return err}
+func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM discussions WHERE id=?`,id);return err}
+func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM discussions`).Scan(&n);return n}
+
+func(d *DB)Search(q string, filters map[string]string)[]Discussion{
+    where:="1=1"
+    args:=[]any{}
+    if q!=""{
+        where+=" AND (title LIKE ? OR body LIKE ?)"
+        args=append(args,"%"+q+"%");args=append(args,"%"+q+"%");
+    }
+    if v,ok:=filters["category"];ok&&v!=""{where+=" AND category=?";args=append(args,v)}
+    if v,ok:=filters["status"];ok&&v!=""{where+=" AND status=?";args=append(args,v)}
+    rows,_:=d.db.Query(`SELECT id,title,body,author,category,reply_count,pinned,status,created_at FROM discussions WHERE `+where+` ORDER BY created_at DESC`,args...)
+    if rows==nil{return nil};defer rows.Close()
+    var o []Discussion;for rows.Next(){var e Discussion;rows.Scan(&e.ID,&e.Title,&e.Body,&e.Author,&e.Category,&e.ReplyCount,&e.Pinned,&e.Status,&e.CreatedAt);o=append(o,e)};return o
+}
+
+func(d *DB)Stats()map[string]any{
+    m:=map[string]any{"total":d.Count()}
+    rows,_:=d.db.Query(`SELECT status,COUNT(*) FROM discussions GROUP BY status`)
+    if rows!=nil{defer rows.Close();by:=map[string]int{};for rows.Next(){var s string;var c int;rows.Scan(&s,&c);by[s]=c};m["by_status"]=by}
+    return m
+}
