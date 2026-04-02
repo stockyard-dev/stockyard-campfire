@@ -1,28 +1,20 @@
 package server
-
 import "net/http"
-
-func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Campfire — Stockyard</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#1a1410;color:#f0e6d3;font-family:'Libre Baskerville',serif;padding:2rem}
-.hdr{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:#a0845c;letter-spacing:3px;text-transform:uppercase;margin-bottom:2rem;border-bottom:2px solid #8b3d1a;padding-bottom:.8rem}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;font-family:'JetBrains Mono',monospace}.card{background:#241e18;border:1px solid #2e261e;padding:1rem}.card-val{font-size:1.6rem;font-weight:700;display:block}.card-lbl{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:#a0845c;margin-top:.2rem}
-.section{margin-bottom:2rem}.section h2{font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:3px;text-transform:uppercase;color:#e8753a;margin-bottom:.8rem;border-bottom:1px solid #2e261e;padding-bottom:.4rem}
-.cat{background:#241e18;padding:.8rem 1rem;margin-bottom:.5rem;border:1px solid #2e261e}.cat-name{font-family:'JetBrains Mono',monospace;font-size:.85rem;color:#f0e6d3;font-weight:600}.cat-desc{font-size:.78rem;color:#7a7060;margin-top:.2rem}.cat-count{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#a0845c;margin-top:.3rem}
-.empty{color:#7a7060;text-align:center;padding:2rem;font-style:italic}
-</style></head><body>
-<div class="hdr">Stockyard · Campfire</div>
-<div class="cards"><div class="card"><span class="card-val" id="s-cats">—</span><span class="card-lbl">Categories</span></div><div class="card"><span class="card-val" id="s-threads">—</span><span class="card-lbl">Threads</span></div><div class="card"><span class="card-val" id="s-replies">—</span><span class="card-lbl">Replies</span></div></div>
-<div class="section"><h2>Categories</h2><div id="cat-list"></div></div>
+func(s *Server)dashboard(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","text/html; charset=utf-8");w.Write([]byte(dashHTML))}
+const dashHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standup</title>
+<style>:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#c45d2c;--rl:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--mono:'JetBrains Mono',Consolas,monospace;--serif:'Libre Baskerville',Georgia,serif}*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);font-size:13px;line-height:1.6}.hdr{padding:.6rem 1.2rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-family:var(--serif);font-size:1rem}.hdr h1 span{color:var(--rl)}.main{max-width:700px;margin:0 auto;padding:1rem}.btn{font-family:var(--mono);font-size:.68rem;padding:.3rem .6rem;border:1px solid;cursor:pointer;background:transparent}.btn-p{border-color:var(--rust);color:var(--rl)}.btn-p:hover{background:var(--rust);color:var(--cream)}.item{background:var(--bg2);border:1px solid var(--bg3);padding:.6rem;margin-bottom:.3rem}.item h3{font-size:.82rem;margin-bottom:.15rem}.item-meta{font-size:.65rem;color:var(--cm);display:flex;gap:.5rem;flex-wrap:wrap}.empty{text-align:center;padding:2rem;color:var(--cm);font-style:italic;font-family:var(--serif)}.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:90%;max-width:500px;max-height:90vh;overflow-y:auto}.modal h2{font-family:var(--serif);font-size:.9rem;margin-bottom:1rem}label.fl{display:block;font-size:.65rem;color:var(--leather);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem;margin-top:.5rem}input[type=text],textarea{background:var(--bg);border:1px solid var(--bg3);color:var(--cream);padding:.35rem .5rem;font-family:var(--mono);font-size:.78rem;width:100%;outline:none}</style>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head><body><div class="hdr"><h1><span>Campfire</span></h1><button class="btn btn-p" onclick="showNew()">+ Standup</button></div>
+<div class="main"><div id="list"></div></div><div id="modal"></div>
 <script>
-async function refresh(){
-  try{const s=await(await fetch('/api/status')).json();document.getElementById('s-cats').textContent=s.categories||0;document.getElementById('s-threads').textContent=s.threads||0;document.getElementById('s-replies').textContent=s.replies||0;}catch(e){}
-  try{const d=await(await fetch('/api/categories')).json();const cs=d.categories||[];
-  document.getElementById('cat-list').innerHTML=cs.length?cs.map(c=>'<div class="cat"><div class="cat-name">'+esc(c.name)+'</div><div class="cat-desc">'+esc(c.description)+'</div><div class="cat-count">'+c.thread_count+' threads</div></div>').join(''):'<div class="empty">No categories yet</div>';}catch(e){}
-}
-function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-refresh();setInterval(refresh,8000);
-</script></body></html>`))
-}
+async function api(u,o){return(await fetch(u,o)).json()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function timeAgo(d){if(!d)return'';const s=Math.floor((Date.now()-new Date(d))/1e3);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';return Math.floor(s/3600)+'h ago'}
+async function load(){const d=await api('/api/standups');const items=d.standups||[];
+document.getElementById('list').innerHTML=items.length?items.map(e=>'<div class="item"><h3>'+esc(e.author)+'</h3><div class="item-meta">'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.author||'')+'</span>'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.yesterday||'')+'</span>'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.today||'')+'</span>'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.blockers||'')+'</span>'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.mood||'')+'</span>'+'<span style="color:var(--cm);font-size:.65rem">'+esc(e.date||'')+'</span>'+'<span>'+timeAgo(e.created_at)+'</span><span style="cursor:pointer;color:var(--cm)" onclick="del(\''+e.id+'\')">del</span></div></div>').join(''):'<div class="empty">No standups yet.</div>'}
+async function del(id){await api('/api/standups/'+id,{method:'DELETE'});load()}
+function showNew(){document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Standup</h2><label class="fl">Author</label><input type="text" id="n-author"><label class="fl">Yesterday</label><input type="text" id="n-yesterday"><label class="fl">Today</label><input type="text" id="n-today"><label class="fl">Blockers</label><input type="text" id="n-blockers"><label class="fl">Mood</label><input type="text" id="n-mood"><label class="fl">Date</label><input type="text" id="n-date"><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="save()">Create</button><button class="btn" style="border-color:var(--bg3);color:var(--cm)" onclick="closeModal()">Cancel</button></div></div></div>'}
+async function save(){const b={author:document.getElementById("n-author").value,yesterday:document.getElementById("n-yesterday").value,today:document.getElementById("n-today").value,blockers:document.getElementById("n-blockers").value,mood:document.getElementById("n-mood").value,date:document.getElementById("n-date").value,};await api('/api/standups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});closeModal();load()}
+function closeModal(){document.getElementById('modal').innerHTML=''}
+load()
+</script></body></html>`

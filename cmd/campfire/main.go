@@ -1,52 +1,6 @@
 package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"strconv"
-
-	"github.com/stockyard-dev/stockyard-campfire/internal/license"
-	"github.com/stockyard-dev/stockyard-campfire/internal/server"
-	"github.com/stockyard-dev/stockyard-campfire/internal/store"
-)
-
-var version = "dev"
-
-func main() {
-	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("campfire %s\n", version)
-		os.Exit(0)
-	}
-	if len(os.Args) > 1 && os.Args[1] == "--health" {
-		fmt.Println("ok")
-		os.Exit(0)
-	}
-	log.SetFlags(log.Ltime | log.Lshortfile)
-	port := 9030
-	if p := os.Getenv("PORT"); p != "" {
-		if n, e := strconv.Atoi(p); e == nil {
-			port = n
-		}
-	}
-	dataDir := os.Getenv("DATA_DIR")
-	if dataDir == "" {
-		dataDir = "./data"
-	}
-	lk := os.Getenv("CAMPFIRE_LICENSE_KEY")
-	li, le := license.Validate(lk, "campfire")
-	if lk != "" && le != nil {
-		li = nil
-	}
-	limits := server.LimitsFor(li)
-	db, err := store.Open(dataDir)
-	if err != nil {
-		log.Fatalf("db: %v", err)
-	}
-	defer db.Close()
-	log.Printf("  Stockyard Campfire %s — http://localhost:%d/ui", version, port)
-	srv := server.New(db, port, limits)
-	if err := srv.Start(); err != nil {
-		log.Fatalf("server: %v", err)
-	}
-}
+import ("fmt";"log";"net/http";"os";"github.com/stockyard-dev/stockyard-campfire/internal/server";"github.com/stockyard-dev/stockyard-campfire/internal/store")
+func main(){port:=os.Getenv("PORT");if port==""{port="8850"};dataDir:=os.Getenv("DATA_DIR");if dataDir==""{dataDir="./campfire-data"}
+db,err:=store.Open(dataDir);if err!=nil{log.Fatalf("campfire: %v",err)};defer db.Close();srv:=server.New(db)
+fmt.Printf("\n  Campfire — Self-hosted async team standup tool\n  ─────────────────────────────────\n  Dashboard:  http://localhost:%s/ui\n  API:        http://localhost:%s/api\n  Data:       %s\n  ─────────────────────────────────\n\n",port,port,dataDir)
+log.Printf("campfire: listening on :%s",port);log.Fatal(http.ListenAndServe(":"+port,srv))}
